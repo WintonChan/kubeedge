@@ -104,8 +104,13 @@ func (*Rest) Forward(target provider.Target, data interface{}) (response interfa
 	messageID := d["messageID"].(string)
 	res["messageID"] = messageID
 	res["param"] = ""
-	res["data"] = d["data"]
+	res["data"], err = ioutil.ReadAll(request.Body)
+	if err != nil {
+		return nil, err
+	}
 	res["nodeName"] = strings.Split(request.RequestURI, "/")[1]
+	res["header"] = request.Header
+	res["method"] = request.Method
 	stop := make(chan struct{})
 	respch := make(chan interface{})
 	errch := make(chan error)

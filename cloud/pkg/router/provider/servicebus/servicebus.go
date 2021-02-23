@@ -9,8 +9,11 @@ import (
 	"github.com/kubeedge/kubeedge/cloud/pkg/router/constants"
 	"github.com/kubeedge/kubeedge/cloud/pkg/router/listener"
 	"github.com/kubeedge/kubeedge/cloud/pkg/router/provider"
+	commonType "github.com/kubeedge/kubeedge/common/types"
 	"k8s.io/klog/v2"
+	"net/http"
 	"strings"
+
 )
 
 type servicebusFactory struct{}
@@ -51,10 +54,12 @@ func (eb *ServiceBus) Name() string {
 func (eb *ServiceBus) GoToTarget(data map[string]interface{}, stop chan struct{}) (interface{}, error) {
 	var response *model.Message
 	messageID, ok := data["messageID"].(string)
-	body, ok := data["data"].([]byte)
 	param, ok := data["param"].(string)
 	nodeName, ok := data["nodeName"].(string)
-	operation, ok := data["operation"].(string)
+	request := commonType.HTTPRequest{}
+	request.Method, ok = data["method"].(string)
+	request.Header, ok = data["header"].(http.Header)
+	request.Body, ok = data["data"].([]byte)
 	if !ok {
 		err := errors.New("data transform failed")
 		klog.Error(err.Error())
@@ -68,8 +73,8 @@ func (eb *ServiceBus) GoToTarget(data map[string]interface{}, stop chan struct{}
 	} else {
 		resource = resource + strings.TrimSuffix(eb.targetPath, "/") + "/" + strings.TrimPrefix(param, "/")
 	}
-	msg.SetResourceOperation(resource, operation)
-	msg.FillBody(string(body))
+	msg.SetResourceOperation(resource, request.Method)
+	msg.FillBody(request)
 	msg.SetRoute("router_eventbus", modules.UserGroup)
 	beehiveContext.Send(modules.CloudHubModuleName, *msg)
 	if stop != nil {
