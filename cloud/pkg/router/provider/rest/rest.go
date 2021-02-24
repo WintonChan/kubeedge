@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/kubeedge/beehive/pkg/core/model"
+	commonType "github.com/kubeedge/kubeedge/common/types"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -81,7 +83,7 @@ func (r *Rest) UnregisterListener() {
 	listener.RestHandlerInstance.RemoveListener(fmt.Sprintf("/%s/%s", r.Namespace, r.Path))
 }
 
-func (*Rest) Forward(target provider.Target, data interface{}) (response interface{}, err error) {
+func (*Rest) Forward(target provider.Target, data interface{}) (interface{}, error) {
 	d := data.(map[string]interface{})
 	v, exist := d["request"]
 	if !exist {
@@ -98,16 +100,17 @@ func (*Rest) Forward(target provider.Target, data interface{}) (response interfa
 	}
 	timeout, ok := v.(time.Duration)
 	if !ok {
-		return nil, errors.New("invalid conver to time.Duration")
+		return nil, errors.New("invalid convert to time.Duration")
 	}
 	res := make(map[string]interface{})
 	messageID := d["messageID"].(string)
 	res["messageID"] = messageID
 	res["param"] = ""
-	res["data"], err = ioutil.ReadAll(request.Body)
+	data, err := ioutil.ReadAll(request.Body)
 	if err != nil {
 		return nil, err
 	}
+	res["data"] = data
 	res["nodeName"] = strings.Split(request.RequestURI, "/")[1]
 	res["header"] = request.Header
 	res["method"] = request.Method
@@ -127,42 +130,54 @@ func (*Rest) Forward(target provider.Target, data interface{}) (response interfa
 		Request: request,
 		Header:  http.Header{},
 	}
-	var respBody string
 	select {
-	case response, ok = <-respch:
+	case resp, ok := <-respch:
 		if !ok {
-			klog.Error("failed to get res Channel")
+			return nil, errors.New("failed to get res Channel")
 		}
 		timer.Stop()
-		httpResponse.StatusCode = http.StatusOK
-		respBody = "message delivered"
+		if resp == nil {
+			httpResponse.StatusCode = http.StatusOK
+			httpResponse.Body = ioutil.NopCloser(strings.NewReader("message delivered"))
+		} else {
+			msg, ok := resp.(*model.Message)
+			if !ok {
+				//klog.Error("invalid response")
+				return nil, errors.New("invalid response")
+			}
+			if resp, ok := msg.GetContent().(commonType.HTTPResponse); ok {
+				httpResponse.StatusCode = resp.StatusCode
+				httpResponse.Body = ioutil.NopCloser(bytes.NewReader(resp.Body))
+				httpResponse.Header = resp.Header
+			}
+		}
 		klog.Infof("response from client, msg id: %s, write result success", messageID)
 	case err := <-errch:
 		timer.Stop()
 		httpResponse.StatusCode = http.StatusInternalServerError
-		respBody = err.Error()
+		httpResponse.Body = ioutil.NopCloser(strings.NewReader(err.Error()))
 		klog.Infof("failed to get response, msg id: %s, write result: %v", messageID, err)
 	case _, ok := <-timer.C:
 		if !ok {
-			klog.Error("failed to get timer channel")
+			//klog.Error("failed to get timer channel")
+			return nil, errors.New("failed to get timer channel")
 		}
 		stop <- struct{}{}
 		httpResponse.StatusCode = http.StatusRequestTimeout
-		respBody = err.Error()
+		httpResponse.Body = ioutil.NopCloser(strings.NewReader(err.Error()))
 		klog.Warningf("operation timeout, msg id: %s, write result: get response timeout", messageID)
 	case _, ok := <-request.Context().Done():
 		if !ok {
-			klog.Error("failed to get request close channel")
+			//klog.Error("failed to get request close channel")
+			return nil, errors.New("failed to get request close channel")
 		}
 		timer.Stop()
-		err = errors.New("client disconnected for handling resource")
 		klog.Warningf("Client disconnected for handling resource, msg id: %s", messageID)
 		stop <- struct{}{}
-		return
+		return nil, errors.New("client disconnected for handling resource")
 	}
-	httpResponse.Body = ioutil.NopCloser(strings.NewReader(respBody))
-	response = httpResponse
-	return
+	//httpResponse.Body = ioutil.NopCloser(strings.NewReader(respBody))
+	return httpResponse, nil
 }
 
 func (r *Rest) GoToTarget(data map[string]interface{}, stop chan struct{}) (interface{}, error) {
