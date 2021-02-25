@@ -125,7 +125,7 @@ func (rh *RestHandler) httpHandler(w http.ResponseWriter, r *http.Request) {
 		klog.Errorf("invalid convert to Handle. match path: %s", matchPath)
 		return
 	}
-	_, err := ioutil.ReadAll(r.Body)
+	b, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		klog.Errorf("request error, write result: %v", err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -140,7 +140,7 @@ func (rh *RestHandler) httpHandler(w http.ResponseWriter, r *http.Request) {
 		params["messageID"] = msgID
 		params["request"] = r
 		params["timeout"] = rh.restTimeout
-		//params["data"] = b
+		params["data"] = b
 
 		v, err := handle(params)
 		if err != nil {

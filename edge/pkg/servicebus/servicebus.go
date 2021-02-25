@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	sourceType  = "router_rest"
+	sourceType  = "router_eventbus"
 	maxBodySize = 5 * 1e6
 )
 
@@ -48,7 +48,7 @@ func (*servicebus) Name() string {
 }
 
 func (*servicebus) Group() string {
-	return modules.UserGroup
+	return modules.BusGroup
 }
 
 func (sb *servicebus) Enable() bool {
@@ -114,7 +114,7 @@ func (sb *servicebus) Start() {
 				return
 			}
 			operation := httpRequest.Method
-			targetURL := "http://127.0.0.1:" + r[0] + "/" + r[1]
+			targetURL := "http://127.0.0.1:" + r[0] + r[1]
 			resp, err := uc.HTTPDo(operation, targetURL, httpRequest.Header, httpRequest.Body)
 			if err != nil {
 				m := "error to call service"
@@ -143,7 +143,7 @@ func (sb *servicebus) Start() {
 			response := commonType.HTTPResponse{Header: resp.Header, StatusCode: resp.StatusCode, Body: resBody}
 			responseMsg := model.NewMessage(msg.GetID())
 			responseMsg.Content = response
-			responseMsg.SetRoute("servicebus", modules.UserGroup)
+			responseMsg.SetRoute("servicebus", modules.UserGroup).SetResourceOperation("", "upload")
 			beehiveContext.SendToGroup(modules.HubGroup, *responseMsg)
 		}()
 	}

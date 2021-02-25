@@ -2,6 +2,7 @@ package rest
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/kubeedge/beehive/pkg/core/model"
@@ -106,11 +107,7 @@ func (*Rest) Forward(target provider.Target, data interface{}) (interface{}, err
 	messageID := d["messageID"].(string)
 	res["messageID"] = messageID
 	res["param"] = ""
-	data, err := ioutil.ReadAll(request.Body)
-	if err != nil {
-		return nil, err
-	}
-	res["data"] = data
+	res["data"] = d["data"]
 	res["nodeName"] = strings.Split(request.RequestURI, "/")[1]
 	res["header"] = request.Header
 	res["method"] = request.Method
@@ -118,7 +115,7 @@ func (*Rest) Forward(target provider.Target, data interface{}) (interface{}, err
 	respch := make(chan interface{})
 	errch := make(chan error)
 	go func() {
-		resp, err := target.GoToTarget(res, nil)
+		resp, err := target.GoToTarget(res, stop)
 		if err != nil {
 			errch <- err
 			return
@@ -145,18 +142,24 @@ func (*Rest) Forward(target provider.Target, data interface{}) (interface{}, err
 				//klog.Error("invalid response")
 				return nil, errors.New("invalid response")
 			}
-			if resp, ok := msg.GetContent().(commonType.HTTPResponse); ok {
-				httpResponse.StatusCode = resp.StatusCode
-				httpResponse.Body = ioutil.NopCloser(bytes.NewReader(resp.Body))
-				httpResponse.Header = resp.Header
+			content, err := json.Marshal(msg.GetContent())
+			if err != nil {
+				return nil, fmt.Errorf("marshall message content failed %v", err)
 			}
+			var response commonType.HTTPResponse
+			if err := json.Unmarshal(content, &response); err != nil {
+				return nil, fmt.Errorf("error to parse http response, reson: %v", err)
+			}
+			httpResponse.StatusCode = response.StatusCode
+			httpResponse.Body = ioutil.NopCloser(bytes.NewReader(response.Body))
+			httpResponse.Header = response.Header
 		}
 		klog.Infof("response from client, msg id: %s, write result success", messageID)
 	case err := <-errch:
 		timer.Stop()
 		httpResponse.StatusCode = http.StatusInternalServerError
 		httpResponse.Body = ioutil.NopCloser(strings.NewReader(err.Error()))
-		klog.Infof("failed to get response, msg id: %s, write result: %v", messageID, err)
+		klog.Errorf("failed to get response, msg id: %s, write result: %v", messageID, err)
 	case _, ok := <-timer.C:
 		if !ok {
 			//klog.Error("failed to get timer channel")
@@ -164,7 +167,7 @@ func (*Rest) Forward(target provider.Target, data interface{}) (interface{}, err
 		}
 		stop <- struct{}{}
 		httpResponse.StatusCode = http.StatusRequestTimeout
-		httpResponse.Body = ioutil.NopCloser(strings.NewReader(err.Error()))
+		httpResponse.Body = ioutil.NopCloser(strings.NewReader("wait to get response time out"))
 		klog.Warningf("operation timeout, msg id: %s, write result: get response timeout", messageID)
 	case _, ok := <-request.Context().Done():
 		if !ok {
