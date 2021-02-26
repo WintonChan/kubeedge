@@ -42,7 +42,7 @@ func (factory *servicebusFactory) GetTarget(ep *v1.RuleEndpoint, targetResource 
 	cli := &ServiceBus{
 		targetPath: targetPath,
 		namespace: ep.Namespace,
-		servicePort: "6666",
+		servicePort: ep.Spec.Properties["service_port"],
 	}
 	return cli
 }

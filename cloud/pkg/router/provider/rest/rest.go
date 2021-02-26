@@ -84,7 +84,7 @@ func (r *Rest) UnregisterListener() {
 	listener.RestHandlerInstance.RemoveListener(fmt.Sprintf("/%s/%s", r.Namespace, r.Path))
 }
 
-func (*Rest) Forward(target provider.Target, data interface{}) (interface{}, error) {
+func (*Rest) Forward(target provider.Target, data interface{}) (response interface{}, err error) {
 	d := data.(map[string]interface{})
 	v, exist := d["request"]
 	if !exist {
