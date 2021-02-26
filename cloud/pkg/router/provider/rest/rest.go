@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/kubeedge/beehive/pkg/core/model"
-	commonType "github.com/kubeedge/kubeedge/common/types"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -15,11 +13,13 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"github.com/kubeedge/beehive/pkg/core/model"
 	v1 "github.com/kubeedge/kubeedge/cloud/pkg/apis/rules/v1"
 	"github.com/kubeedge/kubeedge/cloud/pkg/router/constants"
 	"github.com/kubeedge/kubeedge/cloud/pkg/router/listener"
 	"github.com/kubeedge/kubeedge/cloud/pkg/router/provider"
 	httpUtils "github.com/kubeedge/kubeedge/cloud/pkg/router/utils/http"
+	commonType "github.com/kubeedge/kubeedge/common/types"
 )
 
 var inited int32
@@ -84,7 +84,7 @@ func (r *Rest) UnregisterListener() {
 	listener.RestHandlerInstance.RemoveListener(fmt.Sprintf("/%s/%s", r.Namespace, r.Path))
 }
 
-func (*Rest) Forward(target provider.Target, data interface{}) (response interface{}, err error) {
+func (r *Rest) Forward(target provider.Target, data interface{}) (interface{}, error) {
 	d := data.(map[string]interface{})
 	v, exist := d["request"]
 	if !exist {
@@ -106,7 +106,7 @@ func (*Rest) Forward(target provider.Target, data interface{}) (response interfa
 	res := make(map[string]interface{})
 	messageID := d["messageID"].(string)
 	res["messageID"] = messageID
-	res["param"] = ""
+	res["param"] = strings.TrimLeft(strings.SplitN(request.RequestURI, "/", 4)[3], r.Path)
 	res["data"] = d["data"]
 	res["nodeName"] = strings.Split(request.RequestURI, "/")[1]
 	res["header"] = request.Header
@@ -139,16 +139,24 @@ func (*Rest) Forward(target provider.Target, data interface{}) (response interfa
 		} else {
 			msg, ok := resp.(*model.Message)
 			if !ok {
-				//klog.Error("invalid response")
-				return nil, errors.New("invalid response")
+				klog.Error("response can not convert to Message")
+				httpResponse.StatusCode = http.StatusInternalServerError
+				httpResponse.Body = ioutil.NopCloser(strings.NewReader("invalid response"))
+				return httpResponse, nil
 			}
 			content, err := json.Marshal(msg.GetContent())
 			if err != nil {
-				return nil, fmt.Errorf("marshall message content failed %v", err)
+				klog.Error("message content can not convert to json")
+				httpResponse.StatusCode = http.StatusInternalServerError
+				httpResponse.Body = ioutil.NopCloser(strings.NewReader("invalid response"))
+				return httpResponse, nil
 			}
 			var response commonType.HTTPResponse
 			if err := json.Unmarshal(content, &response); err != nil {
-				return nil, fmt.Errorf("error to parse http response, reson: %v", err)
+				klog.Error("message content can not convert to HTTPResponse")
+				httpResponse.StatusCode = http.StatusInternalServerError
+				httpResponse.Body = ioutil.NopCloser(strings.NewReader("invalid response"))
+				return httpResponse, nil
 			}
 			httpResponse.StatusCode = response.StatusCode
 			httpResponse.Body = ioutil.NopCloser(bytes.NewReader(response.Body))
@@ -162,7 +170,6 @@ func (*Rest) Forward(target provider.Target, data interface{}) (response interfa
 		klog.Errorf("failed to get response, msg id: %s, write result: %v", messageID, err)
 	case _, ok := <-timer.C:
 		if !ok {
-			//klog.Error("failed to get timer channel")
 			return nil, errors.New("failed to get timer channel")
 		}
 		stop <- struct{}{}
@@ -171,7 +178,6 @@ func (*Rest) Forward(target provider.Target, data interface{}) (response interfa
 		klog.Warningf("operation timeout, msg id: %s, write result: get response timeout", messageID)
 	case _, ok := <-request.Context().Done():
 		if !ok {
-			//klog.Error("failed to get request close channel")
 			return nil, errors.New("failed to get request close channel")
 		}
 		timer.Stop()
@@ -179,7 +185,6 @@ func (*Rest) Forward(target provider.Target, data interface{}) (response interfa
 		stop <- struct{}{}
 		return nil, errors.New("client disconnected for handling resource")
 	}
-	//httpResponse.Body = ioutil.NopCloser(strings.NewReader(respBody))
 	return httpResponse, nil
 }
 

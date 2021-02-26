@@ -133,13 +133,13 @@ func (eb *EventBus) GoToTarget(data map[string]interface{}, stop chan struct{}) 
 	msg.FillBody(string(body))
 	msg.SetRoute("router_eventbus", modules.UserGroup)
 	beehiveContext.Send(modules.CloudHubModuleName, *msg)
-	if stop != nil {
-		listener.MessageHandlerInstance.SetCallback(messageID, func(message *model.Message) {
-			response = message
-			stop <- struct{}{}
-		})
-		<-stop
-		listener.MessageHandlerInstance.DelCallback(messageID)
-	}
+	//if stop != nil {
+	//	listener.MessageHandlerInstance.SetCallback(messageID, func(message *model.Message) {
+	//		response = message
+	//		stop <- struct{}{}
+	//	})
+	//	<-stop
+	//	listener.MessageHandlerInstance.DelCallback(messageID)
+	//}
 	return response, nil
 }

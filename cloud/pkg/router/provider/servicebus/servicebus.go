@@ -2,6 +2,11 @@ package servicebus
 
 import (
 	"errors"
+	"net/http"
+	"strings"
+
+	"k8s.io/klog/v2"
+
 	beehiveContext "github.com/kubeedge/beehive/pkg/core/context"
 	"github.com/kubeedge/beehive/pkg/core/model"
 	v1 "github.com/kubeedge/kubeedge/cloud/pkg/apis/rules/v1"
@@ -10,21 +15,17 @@ import (
 	"github.com/kubeedge/kubeedge/cloud/pkg/router/listener"
 	"github.com/kubeedge/kubeedge/cloud/pkg/router/provider"
 	commonType "github.com/kubeedge/kubeedge/common/types"
-	"k8s.io/klog/v2"
-	"net/http"
-	"strings"
-
 )
 
 type servicebusFactory struct{}
 
 type ServiceBus struct {
-	targetPath string
-	namespace string
+	targetPath  string
+	namespace   string
 	servicePort string
 }
 
-func init()  {
+func init() {
 	factory := &servicebusFactory{}
 	provider.RegisterTarget(factory)
 }
@@ -40,8 +41,8 @@ func (factory *servicebusFactory) GetTarget(ep *v1.RuleEndpoint, targetResource 
 		return nil
 	}
 	cli := &ServiceBus{
-		targetPath: targetPath,
-		namespace: ep.Namespace,
+		targetPath:  targetPath,
+		namespace:   ep.Namespace,
 		servicePort: ep.Spec.Properties["service_port"],
 	}
 	return cli
@@ -67,7 +68,7 @@ func (eb *ServiceBus) GoToTarget(data map[string]interface{}, stop chan struct{}
 	}
 	msg := model.NewMessage("")
 	msg.BuildHeader(messageID, "", msg.GetTimestamp())
-	resource := "node/" + nodeName + "/"+eb.servicePort+":"
+	resource := "node/" + nodeName + "/" + eb.servicePort + ":"
 	if !ok || param == "" {
 		resource = resource + eb.targetPath
 	} else {
@@ -87,5 +88,3 @@ func (eb *ServiceBus) GoToTarget(data map[string]interface{}, stop chan struct{}
 	}
 	return response, nil
 }
-
-
