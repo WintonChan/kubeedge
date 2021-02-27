@@ -99,7 +99,13 @@ func (eh *EdgeHub) dispatch(message model.Message) error {
 
 	isResponse := eh.isSyncResponse(message.GetParentID())
 	if !isResponse {
-		beehiveContext.SendToGroup(md, message)
+		if group == messagepkg.UserGroupName && message.GetSource() == "router_eventbus" {
+			beehiveContext.Send(modules.EventBusModuleName, message)
+		} else if group == messagepkg.UserGroupName && message.GetSource() == "router_servicebus" {
+			beehiveContext.Send(modules.ServiceBusModuleName, message)
+		} else {
+			beehiveContext.SendToGroup(md, message)
+		}
 		return nil
 	}
 	return eh.sendToKeepChannel(message)

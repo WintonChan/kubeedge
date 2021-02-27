@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	sourceType  = "router_eventbus"
+	sourceType  = "router_servicebus"
 	maxBodySize = 5 * 1e6
 )
 

@@ -76,7 +76,7 @@ func (eb *ServiceBus) GoToTarget(data map[string]interface{}, stop chan struct{}
 	}
 	msg.SetResourceOperation(resource, request.Method)
 	msg.FillBody(request)
-	msg.SetRoute("router_eventbus", modules.UserGroup)
+	msg.SetRoute("router_servicebus", modules.UserGroup)
 	beehiveContext.Send(modules.CloudHubModuleName, *msg)
 	if stop != nil {
 		listener.MessageHandlerInstance.SetCallback(messageID, func(message *model.Message) {
