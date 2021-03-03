@@ -125,6 +125,7 @@ function start_edgecore {
   ${EDGE_BIN} --minconfig >  ${EDGE_CONFIGFILE}
 
   sed -i '/modules:/a\  edgeStream:\n    enable: true\n    handshakeTimeout: 30\n    readDeadline: 15\n    server: 127.0.0.1:10004\n    tlsTunnelCAFile: /etc/kubeedge/ca/rootCA.crt\n    tlsTunnelCertFile: /etc/kubeedge/certs/server.crt\n    tlsTunnelPrivateKeyFile: /etc/kubeedge/certs/server.key\n    writeDeadline: 15' ${EDGE_CONFIGFILE}
+  sed -i "/eventBus/i\  serviceBus:\n    enable: true" ${EDGE_CONFIGFILE}
   token=`kubectl get secret -nkubeedge tokensecret -o=jsonpath='{.data.tokendata}' | base64 -d`
 
   sed -i -e "s|token: .*|token: ${token}|g" \
@@ -132,6 +133,8 @@ function start_edgecore {
       -e "s|/etc/|/tmp/etc/|g" \
       -e "s|/var/lib/kubeedge/|/tmp&|g" \
       -e "s|mqttMode: .*|mqttMode: 0|g" ${EDGE_CONFIGFILE}
+
+  cat ${EDGE_CONFIGFILE}
 
   EDGECORE_LOG=${LOG_DIR}/edgecore.log
 
