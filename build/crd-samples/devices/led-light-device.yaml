@@ -1,0 +1,16 @@
+
+apiVersion: devices.kubeedge.io/v1alpha3
+kind: Device
+metadata:
+ name: led-light
+ namespace: default
+spec:
+ profile: CC2650
+ service: led-light-service
+ deviceProperties:
+   power-status:
+     name: power-status
+     value: "true"
+   gpio-pin-number:
+     name: gpio-pin-number
+     value: "18"

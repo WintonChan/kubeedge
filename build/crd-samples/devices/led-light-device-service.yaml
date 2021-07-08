@@ -1,0 +1,12 @@
+
+apiVersion: devices.kubeedge.io/v1alpha3
+kind: DeviceService
+metadata:
+ name: led-light-service
+ namespace: default
+spec:
+ controllerName: kubeedgeIoT
+ config:
+   apiVersion: deviceserviceconfig.kubeedge.io
+   kind: DeviceServiceConfig
+   name: led-light-service-config

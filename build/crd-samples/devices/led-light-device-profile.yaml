@@ -1,0 +1,18 @@
+
+apiVersion: devices.kubeedge.io/v1alpha3
+kind: DeviceProfile
+metadata:
+ name: led-light-profile
+ namespace: default
+spec:
+ deviceResource:
+   name: power-status
+   description: power status
+   profileProperty:
+     type: bool
+     mutable: true
+     defaultValue: "false"
+ visitor:
+   apiVersion: devicesvisitor.kubeedge.io/v1alpha3
+   kind: DevicesVisitor
+   name: led-light-visitor-config
